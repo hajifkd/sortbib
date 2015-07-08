@@ -13,6 +13,8 @@ if len(sys.argv) != 2:
 
 f = open(sys.argv[1])
 
+magic = '__ESCAPED__P__'
+citestart = re.compile(r'\\cite\{([^\\\}]+)\}')
 bibstart = re.compile(r'^\s*(%\\cite\{(.+)\})|(\\bibitem\{(.+)\})\s*$')
 inbib = False
 bibend = False
@@ -24,14 +26,20 @@ beforebib = ''
 afterbib = ''
 
 for s in f.readlines():
+    searchs = s.replace('\\%', magic).split('%')[0].replace(magic, '\\%')
     m = bibstart.match(s)
+
     if not m and not inbib:
+        for citedata in citestart.findall(searchs):
+            for cite in citedata.split(','):
+                if not cite in order:
+                    order.append(cite.strip())
         if bibend:
             afterbib += s
         else:
             beforebib += s
     elif not m and inbib:
-        if '\\end{thebibliography}' in s:
+        if '\\end{thebibliography}' in searchs:
             cites[bibname] = bib
             bib = ''
             bibname = ''
@@ -42,7 +50,7 @@ for s in f.readlines():
             bib += s
     elif m: #bib starts
         g = m.groups()
-        nbibname = g[1] if g[1] else g[3]
+        nbibname = (g[1] if g[1] else g[3]).strip()
         if inbib and bibname != nbibname: #move existing bib
             cites[bibname] = bib
             bib = ''
@@ -50,9 +58,11 @@ for s in f.readlines():
         bibname = nbibname
         inbib = True
 
+propbib = ''
 
-print('begin cites')
-print(cites)
+for cite in order:
+    propbib += cites[cite]
 
-print('after cites')
-print(afterbib)
+print(propbib)
+
+notcited = set(cites.keys()) - set(order)
